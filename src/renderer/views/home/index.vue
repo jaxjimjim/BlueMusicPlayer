@@ -20,10 +20,20 @@
       <n-button v-if="!userStore.isLoggedIn" type="primary" @click="router.push('/login')">
         前往登录
       </n-button>
-      <n-button v-else type="primary" ghost @click="syncPlaylists">
-        <template #icon><i class="ri-refresh-line"></i></template>
-        同步歌单
-      </n-button>
+      <div v-else class="flex items-center gap-3">
+        <n-button type="primary" ghost @click="syncPlaylists">
+          <template #icon><i class="ri-refresh-line"></i></template>
+          同步歌单
+        </n-button>
+        <n-button type="success" @click="router.push('/immersive')">
+          <template #icon><i class="ri-fullscreen-fill"></i></template>
+          进入沉浸大屏
+        </n-button>
+        <n-button type="error" ghost @click="handleLogout">
+          <template #icon><i class="ri-logout-box-r-line"></i></template>
+          退出登录
+        </n-button>
+      </div>
     </div>
 
     <!-- Main Scrollable Area -->
@@ -113,6 +123,12 @@ const syncPlaylists = async () => {
     message.error('歌单同步失败');
     console.error(err);
   }
+};
+
+const handleLogout = () => {
+  userStore.logout();
+  playlists.value = [];
+  message.success('已退出登录');
 };
 
 const playPlaylist = async (id: number) => {

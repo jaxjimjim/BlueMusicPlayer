@@ -21,18 +21,6 @@ const layoutRouter = [
       isMobile: true
     },
     component: () => import('@/views/user/index.vue')
-  },
-  {
-    path: '/set',
-    name: 'set',
-    meta: {
-      title: 'comp.settings',
-      icon: 'ri-settings-3-fill',
-      keepAlive: true,
-      noScroll: true,
-      back: true
-    },
-    component: () => import('@/views/set/index.vue')
   }
 ];
 export default layoutRouter;
