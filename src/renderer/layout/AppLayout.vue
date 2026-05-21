@@ -10,8 +10,6 @@
         <!-- 侧边菜单栏 -->
         <app-menu v-if="!settingsStore.isMobile" class="menu" :menus="menuStore.menus" />
         <div class="main">
-          <!-- 搜索栏 -->
-          <search-bar class="search-bar" />
           <!-- 主页面路由 -->
           <div
             class="main-content"
@@ -71,7 +69,6 @@ import { isElectron } from '@/utils';
 
 // 关键布局组件同步导入（始终可见，避免加载闪烁）
 import AppMenu from './components/AppMenu.vue';
-import SearchBar from './components/SearchBar.vue';
 import TitleBar from './components/TitleBar.vue';
 // 移动端专用布局
 import MobileLayout from './MobileLayout.vue';
