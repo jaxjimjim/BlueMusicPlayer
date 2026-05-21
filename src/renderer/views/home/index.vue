@@ -17,7 +17,7 @@
           </p>
         </div>
       </div>
-      <n-button v-if="!userStore.isLoggedIn" type="primary" @click="router.push('/login')">
+      <n-button v-if="!userStore.user" type="primary" @click="router.push('/login')">
         前往登录
       </n-button>
       <div v-else class="flex items-center gap-3">
@@ -50,7 +50,7 @@
             我的歌单
           </h2>
 
-          <div v-if="!userStore.isLoggedIn" class="py-12 text-center text-gray-500">
+          <div v-if="!userStore.user" class="py-12 text-center text-gray-500">
             请先登录网易云账号以获取您的歌单。
           </div>
           
@@ -163,7 +163,7 @@ const playPlaylist = async (id: number) => {
 };
 
 onMounted(() => {
-  if (userStore.isLoggedIn) {
+  if (userStore.user) {
     syncPlaylists();
   }
 });

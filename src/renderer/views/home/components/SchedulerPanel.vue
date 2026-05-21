@@ -102,8 +102,14 @@ const loadPlaylists = async () => {
 // Load schedules from Tauri Backend
 const loadSchedules = async () => {
   try {
-    const res = await invoke<Schedule[]>('get_schedules');
-    schedules.value = res || [];
+    const isTauri = (window as any).__TAURI__ !== undefined;
+    if (isTauri) {
+      const res = await invoke<Schedule[]>('get_schedules');
+      schedules.value = res || [];
+    } else {
+      const res = localStorage.getItem('schedules');
+      schedules.value = res ? JSON.parse(res) : [];
+    }
   } catch (err) {
     console.error('Failed to load schedules', err);
     message.error('无法加载排班表数据');
@@ -113,7 +119,12 @@ const loadSchedules = async () => {
 // Save schedules to Tauri Backend
 const saveSchedules = async () => {
   try {
-    await invoke('set_schedules', { schedules: schedules.value });
+    const isTauri = (window as any).__TAURI__ !== undefined;
+    if (isTauri) {
+      await invoke('set_schedules', { schedules: schedules.value });
+    } else {
+      localStorage.setItem('schedules', JSON.stringify(schedules.value));
+    }
     message.success('排班已保存');
   } catch (err) {
     console.error('Failed to save schedules', err);

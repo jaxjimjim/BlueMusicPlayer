@@ -12,9 +12,10 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   noRetry?: boolean;
 }
 
-const baseURL = window.electron
-  ? `http://127.0.0.1:${setData?.musicApiPort}`
-  : import.meta.env.VITE_API;
+const isTauri = (window as any).__TAURI__ !== undefined;
+const baseURL = (window as any).electron || isTauri
+  ? `http://127.0.0.1:${setData?.musicApiPort || 30488}`
+  : import.meta.env.VITE_API || 'http://127.0.0.1:30488';
 
 const request = axios.create({
   baseURL,
@@ -31,9 +32,10 @@ const RETRY_DELAY = 500;
 request.interceptors.request.use(
   (config: CustomAxiosRequestConfig) => {
     setData = getSetData();
-    config.baseURL = window.electron
-      ? `http://127.0.0.1:${setData?.musicApiPort}`
-      : import.meta.env.VITE_API;
+    const isTauri = (window as any).__TAURI__ !== undefined;
+    config.baseURL = (window as any).electron || isTauri
+      ? `http://127.0.0.1:${setData?.musicApiPort || 30488}`
+      : import.meta.env.VITE_API || 'http://127.0.0.1:30488';
     // 只在retryCount未定义时初始化为0
     if (config.retryCount === undefined) {
       config.retryCount = 0;

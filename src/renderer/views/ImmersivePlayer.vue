@@ -9,41 +9,55 @@
     <div class="background-overlay"></div>
 
     <div class="main-content">
-      <!-- Album Art -->
-      <div class="album-container" :class="{ 'is-playing': isPlaying }">
-        <img
-          :src="albumCover"
-          class="album-art"
-          alt="Album Cover"
-          v-if="albumCover"
-          crossorigin="anonymous"
-          ref="imgRef"
-        />
-        <div v-else class="album-placeholder"></div>
+      <!-- Left Panel: Album Art -->
+      <div class="left-panel">
+        <div class="album-container" :class="{ 'is-playing': isPlaying }">
+          <img
+            :src="albumCover"
+            class="album-art"
+            alt="Album Cover"
+            v-if="albumCover"
+            crossorigin="anonymous"
+            ref="imgRef"
+          />
+          <div v-else class="album-placeholder"></div>
+        </div>
       </div>
 
-      <!-- Dual Line Lyrics -->
-      <div class="lyrics-container">
-        <div class="lyric-line previous-line" :class="{ active: false }">
-          {{ previousLyric }}
-        </div>
-        <div class="lyric-line current-line active" ref="currentLineRef">
-          <template v-if="currentLyricObj?.hasWordByWord && currentLyricObj?.words">
-            <span
-              v-for="(word, index) in currentLyricObj.words"
-              :key="index"
-              class="lyric-word"
-              :style="getWordStyle(word)"
-            >
-              {{ word.text }}<span v-if="word.space">&nbsp;</span>
-            </span>
-          </template>
-          <template v-else>
-            {{ currentLyric || t('player.noLyric') }}
-          </template>
-        </div>
-        <div class="lyric-line next-line" :class="{ active: false }">
-          {{ nextLyric }}
+      <!-- Right Panel: Lyrics -->
+      <div class="right-panel">
+        <div class="lyrics-wrapper" ref="lyricsWrapper">
+          <div class="lyrics-scroll" ref="lyricsScrollRef" :style="lyricsScrollStyle">
+            <template v-if="lrcArray && lrcArray.length > 0">
+              <div 
+                v-for="(line, index) in lrcArray" 
+                :key="index"
+                class="lyric-line"
+                :class="{ 
+                  active: index === nowIndex, 
+                  past: index < nowIndex,
+                  future: index > nowIndex 
+                }"
+              >
+                <template v-if="index === nowIndex && line.hasWordByWord && line.words">
+                  <span
+                    v-for="(word, wIndex) in line.words"
+                    :key="wIndex"
+                    class="lyric-word"
+                    :style="getWordStyle(word)"
+                  >
+                    {{ word.text }}<span v-if="word.space">&nbsp;</span>
+                  </span>
+                </template>
+                <template v-else>
+                  {{ line.text || '&nbsp;' }}
+                </template>
+              </div>
+            </template>
+            <div v-else class="lyric-line active">
+              {{ t('player.noLyric') }}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -71,6 +85,10 @@
         </div>
 
         <div class="playback-controls">
+          <button class="control-btn mode-btn" @click="togglePlayMode" :title="playModeTitle">
+            <i :class="playModeIcon"></i>
+          </button>
+          
           <button class="control-btn" @click="prev">
             <i class="ri-skip-back-fill"></i>
           </button>
@@ -82,7 +100,7 @@
           </button>
           
           <!-- Exit Immersive Mode Button -->
-          <button class="control-btn exit-btn" @click="exitImmersive" title="Exit Immersive Mode">
+          <button class="control-btn exit-btn" @click="exitImmersive" title="退出沉浸大屏">
             <i class="ri-fullscreen-exit-fill"></i>
           </button>
         </div>
@@ -104,29 +122,74 @@ import {
   playMusic
 } from '@/hooks/MusicHook';
 import { usePlayerStore } from '@/store/modules/player';
+import { usePlaylistStore } from '@/store/modules/playlist';
 import { audioService } from '@/services/audioService';
 
 const { t } = useI18n();
 const router = useRouter();
 const playerStore = usePlayerStore();
+const playlistStore = usePlaylistStore();
 
 const controlsVisible = ref(true);
 const hideControlsTimeout = ref<number | null>(null);
 const dominantColor = ref('rgb(20, 20, 20)');
 const imgRef = ref<HTMLImageElement | null>(null);
+const lyricsWrapper = ref<HTMLElement | null>(null);
+const lyricsScrollRef = ref<HTMLElement | null>(null);
+const activeLineTop = ref(0);
 
 const isPlaying = computed(() => playerStore.play);
 const albumCover = computed(() => playMusic.value?.picUrl ? `${playMusic.value.picUrl}?param=500y500` : '');
 const artistName = computed(() => {
   const artists = playMusic.value?.ar || playMusic.value?.song?.artists;
-  return artists ? artists.map(a => a.name).join(' / ') : '';
+  return artists ? artists.map((a: any) => a.name).join(' / ') : '';
 });
 
-// Lyrics logic
-const currentLyricObj = computed(() => lrcArray.value[nowIndex.value]);
-const currentLyric = computed(() => currentLyricObj.value?.text || '');
-const previousLyric = computed(() => nowIndex.value > 0 ? lrcArray.value[nowIndex.value - 1]?.text : '');
-const nextLyric = computed(() => nowIndex.value < lrcArray.value.length - 1 ? lrcArray.value[nowIndex.value + 1]?.text : '');
+// Play Mode
+const playModeIcon = computed(() => {
+  switch (playlistStore.playMode) {
+    case 1: return 'ri-repeat-one-fill';
+    case 2: return 'ri-shuffle-fill';
+    case 0:
+    default: return 'ri-repeat-2-fill';
+  }
+});
+const playModeTitle = computed(() => {
+  switch (playlistStore.playMode) {
+    case 1: return '单曲循环';
+    case 2: return '随机播放';
+    case 0:
+    default: return '列表循环';
+  }
+});
+const togglePlayMode = () => {
+  playlistStore.togglePlayMode();
+};
+
+// Lyrics scroll calculation
+watch(nowIndex, async (newVal) => {
+  if (newVal === -1) {
+    activeLineTop.value = 0;
+    return;
+  }
+  await nextTick();
+  if (lyricsScrollRef.value) {
+    const activeLine = lyricsScrollRef.value.querySelector('.lyric-line.active') as HTMLElement;
+    if (activeLine) {
+      // 使得高亮行的垂直中心对齐到 40vh 处
+      activeLineTop.value = activeLine.offsetTop + (activeLine.offsetHeight / 2);
+    }
+  }
+}, { immediate: true });
+
+const lyricsScrollStyle = computed(() => {
+  if (nowIndex.value === -1 || !lrcArray.value || lrcArray.value.length === 0) {
+    return { transform: 'translateY(0)' };
+  }
+  return { 
+    transform: `translateY(calc(40vh - ${activeLineTop.value}px))` 
+  };
+});
 
 // Progress and Time
 const currentTime = computed(() => nowTime.value);
@@ -171,7 +234,6 @@ onUnmounted(() => {
 });
 
 const getWordStyle = (word: any) => {
-  // Use RAF time for maximum smoothness, fallback to store time
   const time = (currentRafTime.value || nowTime.value) + correctionTime.value;
   const currentTimeMs = time * 1000;
   const wordStartTime = word.startTime;
@@ -288,29 +350,39 @@ const exitImmersive = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(40px);
   z-index: 1;
 }
 
 .main-content {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row;
+  justify-content: space-between;
   align-items: center;
   z-index: 2;
-  padding: 40px;
+  padding: 40px 10%;
+  gap: 10%;
+  height: calc(100vh - 150px);
+}
+
+.left-panel {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  max-width: 45%;
 }
 
 .album-container {
-  width: 40vh;
-  height: 40vh;
-  max-width: 400px;
-  max-height: 400px;
-  border-radius: 20px;
+  width: 50vh;
+  height: 50vh;
+  max-width: 500px;
+  max-height: 500px;
+  border-radius: 30px;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  margin-bottom: 60px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
   transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   
   &.is-playing {
@@ -330,27 +402,68 @@ const exitImmersive = () => {
   background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
 }
 
-.lyrics-container {
-  text-align: center;
-  width: 100%;
-  max-width: 1200px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.right-panel {
+  flex: 1.2;
+  height: 80vh;
+  position: relative;
+  overflow: hidden;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 15%,
+    black 85%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 15%,
+    black 85%,
+    transparent 100%
+  );
+}
+
+.lyrics-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.lyrics-scroll {
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  padding-bottom: 50vh;
 }
 
 .lyric-line {
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-size: 2.2rem;
+  font-weight: 600;
+  min-height: 5rem;
   line-height: 1.4;
-  opacity: 0.4;
-  transition: all 0.5s ease;
-  min-height: 4rem;
+  padding: 1rem 0;
+  opacity: 0.3;
+  transition: all 0.4s ease;
+  transform-origin: left center;
+  white-space: normal;
+  word-break: break-word;
+  
+  &.past {
+    opacity: 0.2;
+    transform: scale(0.9);
+  }
+  
+  &.future {
+    opacity: 0.2;
+    transform: scale(0.9);
+  }
   
   &.active {
     opacity: 1;
-    font-size: 3.5rem;
-    transform: scale(1.05);
+    font-size: 3rem;
+    transform: scale(1);
+    font-weight: 700;
   }
 }
 
@@ -364,12 +477,12 @@ const exitImmersive = () => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 40px 60px;
+  padding: 30px 60px;
   background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
   z-index: 3;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 15px;
 }
 
 .fade-enter-active,
@@ -432,7 +545,7 @@ const exitImmersive = () => {
   justify-content: center;
   align-items: center;
   gap: 40px;
-  margin-top: 10px;
+  margin-top: 5px;
   position: relative;
 }
 
@@ -451,6 +564,12 @@ const exitImmersive = () => {
   }
 }
 
+.mode-btn {
+  position: absolute;
+  left: 0;
+  font-size: 1.5rem;
+}
+
 .play-btn {
   font-size: 3.5rem;
 }
@@ -459,5 +578,42 @@ const exitImmersive = () => {
   position: absolute;
   right: 0;
   font-size: 1.5rem;
+}
+
+/* 移动端或小屏适配 */
+@media screen and (max-width: 900px) {
+  .main-content {
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+  }
+  
+  .left-panel {
+    justify-content: center;
+    max-width: 100%;
+    margin-bottom: 20px;
+  }
+  
+  .album-container {
+    width: 30vh;
+    height: 30vh;
+  }
+  
+  .right-panel {
+    width: 100%;
+  }
+  
+  .lyric-line {
+    text-align: center;
+    transform-origin: center center;
+    font-size: 1.5rem;
+    min-height: 3rem;
+    line-height: 1.4;
+    padding: 0.5rem 0;
+    
+    &.active {
+      font-size: 2rem;
+    }
+  }
 }
 </style>

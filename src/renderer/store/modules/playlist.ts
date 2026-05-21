@@ -736,6 +736,13 @@ export const usePlaylistStore = defineStore(
       listen<{ playlist_id: string }>('switch-playlist', (event) => {
         console.log('[PlaylistStore] 收到切换歌单事件', event.payload);
         pendingPlaylistId.value = event.payload.playlist_id;
+        
+        // 如果当前没有在播放，则强制触发播放
+        const playerCore = usePlayerCoreStore();
+        if (!playerCore.isPlay) {
+          console.log('[PlaylistStore] 当前未播放，立即触发定时播放');
+          _nextPlay(0, true);
+        }
       });
 
       // 重启后恢复随机播放状态
