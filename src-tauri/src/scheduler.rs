@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
 use chrono::Local;
 
